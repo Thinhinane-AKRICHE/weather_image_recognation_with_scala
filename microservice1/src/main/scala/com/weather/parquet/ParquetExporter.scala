@@ -5,31 +5,20 @@ import org.apache.spark.sql.{Encoders, SaveMode, SparkSession}
 
 object ParquetExporter {
 
-  def write(outputPath: String, records: Seq[WeatherImageRecord]): Unit = {
-    val spark = SparkSession.builder()
-      .appName("WeatherRecognition")
-      .master("local[*]")
-      // --- AJOUT DES LIGNES CI-DESSOUS ---
-      .config("spark.driver.memory", "4g")    // Alloue 4 Go au Driver (celui qui gère ta liste de records)
-      .config("spark.executor.memory", "4g")  // Alloue 4 Go aux exécuteurs
-      .config("spark.driver.maxResultSize", "2g") // Pour éviter les crashs lors du transfert de gros datasets
-      // ----------------------------------
-      .config("spark.hadoop.io.nativeio.disable", "true")
-      .config("spark.sql.parquet.compression.codec", "snappy")
-      .getOrCreate()
+  def write(
+      spark: SparkSession,
+      outputPath: String,
+      records: Seq[WeatherImageRecord],
+      mode: SaveMode
+  ): Unit = {
 
-    try {
-      import spark.implicits._
+    import spark.implicits._
 
-      // Ton code reste le même...
-      val ds = spark.createDataset(records)(Encoders.product[WeatherImageRecord])
+    val ds = spark.createDataset(records)(Encoders.product[WeatherImageRecord])
 
-      ds.write
-        .mode(SaveMode.Overwrite)
-        .parquet(outputPath)
-
-    } finally {
-      spark.stop()
-    }
+    ds.coalesce(1)
+      .write
+      .mode(mode)
+      .parquet(outputPath)
   }
 }
